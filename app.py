@@ -18,17 +18,36 @@ def index():
 
 @app.route('/select_side', methods=['POST'])
 def select_side():
-    side = request.json.get('side') # 2 for King, 1 for Pawns
-    session['human_side'] = int(side)
+    data = request.json
+    side = data.get('side') # 2, 1, or 'pvp'
     board.reset_board()
     
-    # If human is Pawns, AI (King) moves first
-    if session['human_side'] == board.PAWN:
-        ai_move = ai.get_best_move(board)
-        if ai_move:
-            board.move_piece(*ai_move)
+    if side == 'pvp':
+        session['human_side'] = 'pvp'
+    else:
+        session['human_side'] = int(side)
+        # If human plays Pawns, AI (King) moves first
+        if session['human_side'] == board.PAWN:
+            ai_move = ai.get_best_move(board)
+            if ai_move:
+                board.move_piece(*ai_move)
             
     return get_state()
+
+@app.route('/legal_moves', methods=['POST'])
+def legal_moves():
+    data = request.json
+    x, y = data["pos"]
+
+    moves = board.get_legal_moves()
+
+    legal = [
+        m for m in moves if m[0] == (x, y)
+    ]
+
+    return jsonify({
+        "moves": [m[1] for m in legal]
+    })
 
 @app.route('/evaluate', methods=['GET'])
 def evaluate():
@@ -50,22 +69,17 @@ def move():
     data = request.json
     from_pos = tuple(data['from'])
     to_pos = tuple(data['to'])
+    is_pvp = session.get('human_side') == 'pvp'
     
-    # 1. Check if it's actually the human's turn
-    if board.turn != session['human_side']:
+    # In PvP, any side can move. In Solo, check turn.
+    if not is_pvp and board.turn != session['human_side']:
         return get_state()
 
-    # 2. Check if the human is moving their own piece
-    piece_at_src = board.get_piece(from_pos[0], from_pos[1])
-    if piece_at_src != session['human_side']:
-        return get_state()
-
-    # 3. Execute Human Move
+    # Execute Move
     if board.move_piece(from_pos, to_pos):
-        # 4. Check if game ended
         res = board.is_terminal(board.get_legal_moves())
-        if res == 0:
-            # 5. Trigger AI Move
+        # Only trigger AI if NOT in PvP mode and game isn't over
+        if not is_pvp and res == 0:
             ai_move = ai.get_best_move(board)
             if ai_move:
                 board.move_piece(*ai_move)

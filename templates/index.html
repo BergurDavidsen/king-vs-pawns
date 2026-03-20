@@ -1,0 +1,170 @@
+<!doctype html>
+<html>
+  <head>
+    <title>Chess Variant</title>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/chessboard-js/1.0.0/chessboard-1.0.0.min.css"
+    />
+    <style>
+      .controls {
+        margin-bottom: 10px;
+        font-family: sans-serif;
+      }
+      .winner {
+        color: red;
+        font-weight: bold;
+        font-size: 1.2em;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="controls">
+      <button onclick="toggleAnalysis()">Toggle Analysis</button>
+      <button onclick="pickSide(2)">Play as King (White)</button>
+      <button onclick="pickSide(1)">Play as Pawns (Black)</button>
+      <span id="status"></span>
+    </div>
+
+    <div
+      id="loading"
+      style="display: none; font-family: sans-serif; margin-bottom: 10px"
+    >
+      <strong>AI is thinking...</strong>
+    </div>
+
+    <div
+      id="analysis"
+      style="display: none; margin-bottom: 10px; font-family: sans-serif"
+    >
+      <div>Evaluation: <span id="eval"></span></div>
+      <div>Best Move: <span id="bestMove"></span></div>
+    </div>
+    <div id="board" style="width: 400px"></div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/chessboard-js/1.0.0/chessboard-1.0.0.min.js"></script>
+    <script>
+      let analysisVisible = false;
+
+      function toggleAnalysis() {
+        analysisVisible = !analysisVisible;
+        document.getElementById("analysis").style.display = analysisVisible
+          ? "block"
+          : "none";
+
+        if (analysisVisible) {
+          updateEvaluation();
+        }
+      }
+
+      function updateEvaluation() {
+        fetch("/evaluate")
+          .then((res) => res.json())
+          .then((data) => {
+            document.getElementById("eval").innerText = data.evaluation;
+
+            if (data.best_move) {
+              const from = data.best_move[0];
+              const to = data.best_move[1];
+
+              const toSquare = (pos) => {
+                const file = String.fromCharCode(97 + pos[0]);
+                const rank = pos[1] + 1;
+                return file + rank;
+              };
+
+              document.getElementById("bestMove").innerText =
+                toSquare(from) + " -> " + toSquare(to);
+            }
+          });
+      }
+    </script>
+    <script>
+      let humanSide = null;
+      let gameOver = false;
+
+      function pieceTheme(piece) {
+        return (
+          "https://chessboardjs.com/img/chesspieces/wikipedia/" + piece + ".png"
+        );
+      }
+
+      const board = Chessboard("board", {
+        draggable: true,
+        pieceTheme: pieceTheme,
+        onDragStart: function (source, piece, position, orientation) {
+          // Do not pick up pieces if game over or not your turn
+          if (gameOver || humanSide === null) return false;
+          if (
+            (humanSide === 2 && piece.search(/^b/) !== -1) ||
+            (humanSide === 1 && piece.search(/^w/) !== -1)
+          ) {
+            return false;
+          }
+        },
+        onDrop: function (source, target) {
+          fetch("/move", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              from: [source.charCodeAt(0) - 97, parseInt(source[1]) - 1],
+              to: [target.charCodeAt(0) - 97, parseInt(target[1]) - 1],
+            }),
+          })
+            .then((res) => res.json())
+            .then(updateUI)
+            .then(() => {
+              if (analysisVisible) updateEvaluation();
+            });
+        },
+      });
+
+      function pickSide(side) {
+        // show loading immediately
+        document.getElementById("loading").style.display = "block";
+        document.getElementById("status").innerText = "Setting up game...";
+
+        fetch("/select_side", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ side: side }),
+        })
+          .then((res) => res.json())
+          .then((data) => {
+            humanSide = side;
+            gameOver = false;
+
+            // hide loading when response arrives
+            document.getElementById("loading").style.display = "none";
+
+            updateUI(data);
+          })
+          .catch(() => {
+            document.getElementById("loading").style.display = "none";
+          });
+      }
+
+      function updateUI(data) {
+        board.position(data.fen);
+        const status = document.getElementById("status");
+
+        if (data.winner !== 0) {
+          gameOver = true;
+          status.innerHTML = `<span class="winner">Game Over! ${
+            data.winner === 1 ? "King" : "Pawns"
+          } Wins!</span>`;
+          document.getElementById("loading").style.display = "none";
+        } else {
+          if (data.turn === humanSide) {
+            status.innerText = "Your Turn";
+            document.getElementById("loading").style.display = "none";
+          } else {
+            status.innerText = "AI is thinking...";
+            document.getElementById("loading").style.display = "block";
+          }
+        }
+      }
+    </script>
+  </body>
+</html>

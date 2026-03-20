@@ -112,7 +112,7 @@ class Board:
         
         return 0
     def get_state(self):
-        return tuple(self.board, self.turn)
+        return(tuple(self.board), self.turn)
     
     def reset_board(self):
         b = Board()
@@ -156,7 +156,7 @@ class Board:
                     if piece == self.KING:
                         row += "K"
                     elif piece == self.PAWN:
-                        row += "P"
+                        row += "p"
 
             if empty > 0:
                 row += str(empty)

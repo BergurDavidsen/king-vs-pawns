@@ -66,7 +66,7 @@ def moves_to_notation(history):
 
 def main():
     b = Board()
-    king_player = RandomPlayer("random")
+    king_player = MinimaxPlayer("minimax")
     pawns_player = MinimaxPlayer("minimax")
     
     g = Game(king_player, pawns_player)

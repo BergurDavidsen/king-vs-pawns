@@ -1,8 +1,13 @@
+import os
 import time
 
-from engine import minimax, play_optimal_game
-from game import Board
+from board import Board
+from game import Game
+from human_player import HumanPlayer
+from minimax_player import MinimaxPlayer
+from random_player import RandomPlayer
 from renderer import render
+from svg_to_gif import create_gif
 
 def explore_states(board:Board, seen_states):
     state = (tuple(board.board), board.turn)
@@ -23,7 +28,6 @@ def explore_states(board:Board, seen_states):
 def get_state_space_size():
     b = Board()
     
-
     # place king
     b.set_piece(0, 3, b.KING)
 
@@ -59,31 +63,30 @@ def moves_to_notation(history):
             moves_str[-1] += f" {move_str}"
 
     return " ".join(moves_str)
+
 def main():
     b = Board()
+    king_player = RandomPlayer("random")
+    pawns_player = MinimaxPlayer("minimax")
+    
+    g = Game(king_player, pawns_player)
     
     b.reset_board()
-    # place king
-    b.set_piece(3, 0, b.KING)
-
-    # place pawns
-    b.set_piece(0, 7, b.PAWN)
-    b.set_piece(2, 7, b.PAWN)
-    b.set_piece(4, 7, b.PAWN)
-    b.set_piece(6, 7, b.PAWN)
-
-    b.print_board()
 
     start = time.time()
-    history, result = play_optimal_game(b)
+    history, result = g.play_optimal_game(b)
     end = time.time()
     
     print(moves_to_notation(history))
     
-    print(f"{"Pawns win" if result==-1 else "King wins"}\nCompute time: {round(end-start, 3)}ms")
+    print(f"{pawns_player.name if result==-1 else king_player.name} wins\nCompute time: {round(end-start, 3)}ms")
     b.reset_board()
-    render(b, history)
-        
+    
+    frames, out_dir = render(b, history)
+    
+    # png_files = convert_svgs_to_pngs(frames, out_dir)
+    
+    # create_gif(out_dir, os.path.join(out_dir, "game.gif"))
         
 if __name__ == "__main__":
     main()

@@ -107,3 +107,41 @@ class MinimaxPlayer(Player):
                     best_move = move
 
         return best_move
+    
+    def get_top_lines(self, board, depth_limit=8, top_k=2):
+        moves = board.get_legal_moves()
+        scored = []
+
+        for move in moves:
+            b_copy = board.copy()
+            b_copy.move_piece(*move)
+            val = self.minimax(b_copy)
+            scored.append((val, move))
+
+        reverse = board.turn == board.KING
+        scored.sort(reverse=reverse, key=lambda x: x[0])
+
+        top_lines = []
+
+        for val, move in scored[:top_k]:
+            line = [move]
+            b_copy = board.copy()
+            b_copy.move_piece(*move)
+
+            for _ in range(depth_limit - 1):
+                if b_copy.is_terminal(b_copy.get_legal_moves()) != 0:
+                    break
+
+                best = self.get_best_move(b_copy)
+                if not best:
+                    break
+
+                line.append(best)
+                b_copy.move_piece(*best)
+
+            top_lines.append({
+                "value": val,
+                "line": line
+            })
+
+        return top_lines

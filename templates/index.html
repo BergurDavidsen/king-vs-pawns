@@ -1,173 +1,215 @@
 <!doctype html>
 <html>
   <head>
-    <title>Chess Variant</title>
+    <title>Chess Variant | Engine</title>
 
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-    <link
-      rel="stylesheet"
-      href="https://cdnjs.cloudflare.com/ajax/libs/chessboard-js/1.0.0/chessboard-1.0.0.min.css"
-    />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/chessboard-js/1.0.0/chessboard-1.0.0.min.css" />
 
     <style>
+      :root {
+        --bg-color: #161512;
+        --panel-bg: #262421;
+        --accent-blue: #4a6ee0;
+        --accent-green: #789922;
+        --accent-red: #da3434;
+        --text-main: #bababa;
+        --text-bright: #ffffff;
+      }
+
       body {
         margin: 0;
-        font-family: "Segoe UI", Tahoma, sans-serif;
-        background: #1e1e2f;
-        color: #eee;
+        font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+        background-color: var(--bg-color);
+        color: var(--text-main);
         display: flex;
         justify-content: center;
-        align-items: flex-start;
-        padding-top: 40px;
+        align-items: center;
+        min-height: 100vh;
       }
 
       .container {
         display: flex;
-        gap: 30px;
+        gap: 20px;
+        padding: 20px;
+        max-width: 1200px;
+        width: 100%;
+        justify-content: center;
       }
 
       .panel {
-        background: #2a2a3d;
-        padding: 15px;
-        border-radius: 10px;
-        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
-        min-width: 220px;
+        background: var(--panel-bg);
+        padding: 20px;
+        border-radius: 4px;
+        box-shadow: 0 8px 16px rgba(0, 0, 0, 0.5);
+        width: 280px;
+        display: flex;
+        flex-direction: column;
       }
 
       .title {
-        font-weight: bold;
-        margin-bottom: 10px;
-        font-size: 1.1em;
+        color: var(--text-bright);
+        font-weight: 600;
+        margin-bottom: 20px;
+        font-size: 1.2em;
+        border-bottom: 1px solid #333;
+        padding-bottom: 10px;
+        text-transform: uppercase;
+        letter-spacing: 1px;
       }
 
       button {
         display: block;
         width: 100%;
-        margin-bottom: 8px;
-        padding: 8px;
+        margin-bottom: 10px;
+        padding: 12px;
         border: none;
-        border-radius: 6px;
-        background: #4a6ee0;
-        color: white;
+        border-radius: 4px;
+        background: #3c3a37;
+        color: var(--text-bright);
+        font-weight: bold;
         cursor: pointer;
-        transition: 0.2s;
+        transition: all 0.2s ease;
       }
 
-      button:hover {
-        background: #6f8cff;
-      }
+      button:hover { background: #454340; transform: translateY(-1px); }
+      button.primary { background: var(--accent-blue); }
+      button.success { background: var(--accent-green); }
+      button.danger { background: var(--accent-red); margin-top: auto; }
 
       #board-container {
         position: relative;
+        background: #2b2b2b;
+        padding: 10px;
+        border-radius: 4px;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.6);
       }
 
-      #board {
-        width: 400px;
-        border-radius: 8px;
-        overflow: hidden;
-        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
-      }
+      #board { width: 500px; }
 
       #overlay {
         position: absolute;
-        top: 0;
-        left: 0;
-        width: 400px;
-        height: 400px;
-        background: rgba(0, 0, 0, 0.6);
+        top: 10px; left: 10px;
+        width: 500px; height: 500px;
+        background: rgba(0, 0, 0, 0.7);
         display: none;
         justify-content: center;
         align-items: center;
-        font-size: 18px;
-        border-radius: 8px;
+        font-size: 20px;
+        color: white;
+        z-index: 100;
       }
 
       #status {
-        margin-top: 10px;
-        font-size: 0.95em;
-      }
-
-      .winner {
-        color: #ff6b6b;
+        margin: 15px 0;
+        padding: 10px;
+        background: #312e2b;
+        border-radius: 4px;
+        text-align: center;
         font-weight: bold;
       }
 
-      .analysis-item {
-        margin-bottom: 6px;
-      }
-      .highlight {
-        background: radial-gradient(
-          circle,
-          rgba(0, 255, 0, 0.4) 40%,
-          transparent 40%
-        );
+      .winner { color: #f0d9b5; font-size: 1.2em; }
+
+      /* Eval Bar Styling */
+      #eval-wrapper {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 10px;
+        margin: 10px 0;
       }
 
       #evalbar-container {
-        width: 20px;
-        height: 400px;
-        background: #444;
-        border-radius: 10px;
+        width: 35px; /* Slightly wider for text */
+        height: 300px;
+        background: #403d39; /* Black side */
+        border-radius: 2px;
         overflow: hidden;
-        margin-right: 10px;
+        position: relative;
+        border: 2px solid #222;
       }
 
       #evalbar {
         width: 100%;
         height: 50%;
-        background: white;
-        transition: height 0.3s;
+        background: white; /* King side */
+        position: absolute;
+        bottom: 0;
+        transition: height 0.6s cubic-bezier(0.23, 1, 0.32, 1);
+      }
+
+      #eval-text-inside {
+        position: absolute;
+        width: 100%;
+        text-align: center;
+        font-weight: bold;
+        font-size: 0.75rem;
+        z-index: 5;
+        /* Positioned based on king/pawn dominance via JS */
+        bottom: 50%; 
+        transition: bottom 0.6s, color 0.3s;
+        color: #fff;
+        pointer-events: none;
+      }
+
+      .analysis-item { margin-bottom: 12px; font-size: 0.95em; }
+      #eval { font-weight: bold; color: var(--text-bright); }
+      #bestMove { color: var(--accent-green); font-family: monospace; font-size: 1.1em; }
+
+      #lines div {
+        background: #312e2b;
+        margin-top: 5px;
+        padding: 5px;
+        border-radius: 3px;
+        font-size: 0.85em;
+        font-family: monospace;
+      }
+
+      .highlight {
+        box-shadow: inset 0 0 3px 3px rgba(255, 255, 255, 0.5);
+        background: radial-gradient(circle, rgba(255,255,255,0.3) 20%, transparent 50%);
       }
     </style>
   </head>
 
   <body>
-    <defs>
-      <marker
-        id="arrowhead"
-        markerWidth="10"
-        markerHeight="7"
-        refX="10"
-        refY="3.5"
-        orient="auto"
-      >
-        <polygon points="0 0, 10 3.5, 0 7" fill="red" />
-      </marker>
-    </defs>
     <div class="container">
-      <!-- LEFT PANEL -->
       <div class="panel">
-        <div class="title">Game Controls</div>
-        <button onclick="pickSide(2)">Play as King</button>
-        <button onclick="pickSide(1)">Play as Pawns</button>
-        <button onclick="pickSide('pvp')" style="background: #28a745">
-          PvP / Analysis Mode
-        </button>
-        <button onclick="toggleAnalysis()">Toggle Analysis</button>
-        <button
-          onclick="reset_board()"
-          style="background: #e04a4a; margin-top: 20px"
-        >
-          Reset Game
-        </button>
+        <div class="title">Controls</div>
+        <button class="primary" onclick="pickSide(2)">Play as King</button>
+        <button class="primary" onclick="pickSide(1)">Play as Pawns</button>
+        <button class="success" onclick="pickSide('pvp')">PvP Mode</button>
+        <button id="analysisBtn" onclick="toggleAnalysis()">Show Engine</button>
+        <button id="evalBarBtn" onclick="toggleEvalBar()">Hide Eval Bar</button>
+        
+        <div id="status">Waiting...</div>
 
-        <div id="status">Choose a side</div>
-        <div id="evalbar-container">
-          <div id="evalbar"></div>
+        <div id="eval-wrapper">
+            <div id="evalbar-container">
+              <div id="eval-text-inside">0.0</div>
+              <div id="evalbar"></div>
+            </div>
+            <span>EVAL</span>
         </div>
+
+        <button class="danger" onclick="reset_board()">Reset</button>
       </div>
 
-      <!-- BOARD -->
       <div id="board-container">
         <div id="board"></div>
-        <div id="overlay">AI is thinking...</div>
+        <svg id="arrow-layer" width="500" height="500" style="position: absolute; top: 10px; left: 10px; pointer-events: none; z-index: 10;"></svg>
+        <div id="overlay">Thinking...</div>
       </div>
 
-      <!-- RIGHT PANEL -->
-      <div id="analysis" class="panel" style="display: none">
-        <div class="title">Analysis</div>
-        <div class="analysis-item">Evaluation: <span id="eval">-</span></div>
-        <div class="analysis-item">Best Move: <span id="bestMove">-</span></div>
+      <div id="analysis" class="panel" style="visibility: hidden">
+        <div class="title">Engine Details</div>
+        <div class="analysis-item">Score: <span id="eval">0.0</span></div>
+        <div class="analysis-item">Best: <span id="bestMove">-</span></div>
+        <div class="analysis-item">
+          Lines:
+          <div id="lines"></div>
+        </div>
       </div>
     </div>
 
@@ -177,46 +219,56 @@
       let humanSide = null;
       let gameOver = false;
       let analysisVisible = false;
+      let evalBarVisible = true;
 
-      function pieceTheme(piece) {
-        return (
-          "https://chessboardjs.com/img/chesspieces/wikipedia/" + piece + ".png"
-        );
-      }
+      function pieceTheme(piece) { return "https://chessboardjs.com/img/chesspieces/wikipedia/" + piece + ".png"; }
+      function reset_board() { location.reload(); }
+      function toSquare(pos) { return String.fromCharCode(97 + pos[0]) + (pos[1] + 1); }
 
-      function reset_board() {
-        location.reload();
-      }
-
-      function clearHighlights() {
-        document.querySelectorAll(".square-55d63").forEach((sq) => {
-          sq.classList.remove("highlight");
+      function renderLines(lines) {
+        const container = document.getElementById("lines");
+        container.innerHTML = "";
+        if(!lines || !analysisVisible) return;
+        lines.forEach((l, i) => {
+          const moves = l.line.map((m) => `${toSquare(m[0])}${toSquare(m[1])}`).join(" ");
+          const div = document.createElement("div");
+          div.innerText = `[${l.value}] ${moves}`;
+          container.appendChild(div);
         });
       }
 
-      function updateEvalBar(value) {
-        // value: -1 (pawns win) to +1 (king wins)
-        let percent = (value + 1) / 2; // normalize to 0–1
-        percent = Math.max(0, Math.min(1, percent));
+      function updateEvalUI(score, evalText) {
+        // 1. Update the Bar Height
+        const clampedScore = Math.max(-100, Math.min(100, score));
+        const percent = (clampedScore + 100) / 200;
+        const heightPercent = percent * 100;
+        document.getElementById("evalbar").style.height = heightPercent + "%";
 
-        document.getElementById("evalbar").style.height = percent * 100 + "%";
+        // 2. Update the Text Inside Bar
+        const textLabel = document.getElementById("eval-text-inside");
+        textLabel.innerText = evalText;
+        
+        // Position text: if king is winning (>50% white), put text in the white part, else in dark
+        if (heightPercent > 50) {
+            textLabel.style.bottom = "10px";
+            textLabel.style.color = "#000";
+        } else {
+            textLabel.style.bottom = "calc(100% - 25px)";
+            textLabel.style.color = "#fff";
+        }
+
+        // 3. Update the Analysis Panel if visible
+        if (analysisVisible) {
+            document.getElementById("eval").innerText = evalText;
+        }
       }
 
       function highlightSquares(squares) {
         squares.forEach((pos) => {
-          const file = String.fromCharCode(97 + pos[0]);
-          const rank = pos[1] + 1;
-          const square = file + rank;
-
+          const square = toSquare(pos);
           const el = document.querySelector(`.square-${square}`);
           if (el) el.classList.add("highlight");
         });
-      }
-
-      function showOverlay(show) {
-        document.getElementById("overlay").style.display = show
-          ? "flex"
-          : "none";
       }
 
       const board = Chessboard("board", {
@@ -224,41 +276,26 @@
         pieceTheme: pieceTheme,
         onDragStart: function (source, piece) {
           if (gameOver || humanSide === null) return false;
-
-          // If not PvP, restrict movement to the chosen side
           if (humanSide !== "pvp") {
-            if (
-              (humanSide === 2 && piece.search(/^b/) !== -1) ||
-              (humanSide === 1 && piece.search(/^w/) !== -1)
-            ) {
-              return false;
-            }
-            // Also prevent moving out of turn
-            // (Simplified: backend handles strict turn validation)
+            if ((humanSide === 2 && piece.search(/^b/) !== -1) ||
+                (humanSide === 1 && piece.search(/^w/) !== -1)) return false;
           }
         },
-
         onMouseoverSquare: function (square) {
           const x = square.charCodeAt(0) - 97;
           const y = parseInt(square[1]) - 1;
-
           fetch("/legal_moves", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ pos: [x, y] }),
-          })
-            .then((res) => res.json())
-            .then((data) => {
-              clearHighlights();
-              highlightSquares(data.moves);
-            });
+          }).then(res => res.json()).then(data => {
+            document.querySelectorAll('.square-55d63').forEach(s => s.classList.remove('highlight'));
+            highlightSquares(data.moves);
+          });
         },
-
-        onMouseoutSquare: clearHighlights,
-
+        onMouseoutSquare: () => document.querySelectorAll('.square-55d63').forEach(s => s.classList.remove('highlight')),
         onDrop: function (source, target) {
-          showOverlay(true);
-
+          document.getElementById("overlay").style.display = "flex";
           fetch("/move", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -266,115 +303,95 @@
               from: [source.charCodeAt(0) - 97, parseInt(source[1]) - 1],
               to: [target.charCodeAt(0) - 97, parseInt(target[1]) - 1],
             }),
-          })
-            .then((res) => res.json())
-            .then(updateUI)
-            .then(() => {
-              if (analysisVisible) updateEvaluation();
-            });
+          }).then(res => res.json()).then(updateUI);
         },
       });
 
       function drawArrow(from, to) {
+        if (!analysisVisible) return;
         const svg = document.getElementById("arrow-layer");
-        svg.innerHTML = `
-    <defs>
-      <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto">
-        <polygon points="0 0, 10 3.5, 0 7" fill="rgba(255,0,0,0.7)" />
-      </marker>
-    </defs>`;
-
-        const sqSize = 400 / 8;
+        svg.innerHTML = `<defs><marker id="arrowhead" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto"><polygon points="0 0, 10 3.5, 0 7" fill="rgba(110, 224, 74, 0.8)" /></marker></defs>`;
+        const sqSize = 500 / 8;
         const fx = from[0] * sqSize + sqSize / 2;
         const fy = (7 - from[1]) * sqSize + sqSize / 2;
         const tx = to[0] * sqSize + sqSize / 2;
         const ty = (7 - to[1]) * sqSize + sqSize / 2;
-
-        const line = document.createElementNS(
-          "http://www.w3.org/2000/svg",
-          "line",
-        );
-        line.setAttribute("x1", fx);
-        line.setAttribute("y1", fy);
-        line.setAttribute("x2", tx);
-        line.setAttribute("y2", ty);
-        line.setAttribute("stroke", "rgba(255,0,0,0.7)");
-        line.setAttribute("stroke-width", "6");
+        const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+        line.setAttribute("x1", fx); line.setAttribute("y1", fy);
+        line.setAttribute("x2", tx); line.setAttribute("y2", ty);
+        line.setAttribute("stroke", "rgba(110, 224, 74, 0.8)");
+        line.setAttribute("stroke-width", "8");
         line.setAttribute("marker-end", "url(#arrowhead)");
         svg.appendChild(line);
       }
 
       function pickSide(side) {
-        document.getElementById("status").innerText = "Starting game...";
-        showOverlay(true);
-
+        document.getElementById("overlay").style.display = "flex";
         fetch("/select_side", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ side: side }),
-        })
-          .then((res) => res.json())
-          .then((data) => {
-            humanSide = side;
-            gameOver = false;
-            updateUI(data);
-          });
+        }).then(res => res.json()).then(updateUI);
       }
 
       function updateUI(data) {
         board.position(data.fen);
-        humanSide = data.human_side; // Sync side with session
+        humanSide = data.human_side;
         const status = document.getElementById("status");
-
         if (data.winner !== 0) {
           gameOver = true;
-          let winMsg = data.winner > 0 ? "King Wins!" : "Pawns Win!";
-          status.innerHTML = `<span class="winner">${winMsg}</span>`;
-          showOverlay(false);
+          status.innerHTML = `<span class="winner">${data.winner > 0 ? "King Wins!" : "Pawns Win!"}</span>`;
+          document.getElementById("arrow-layer").innerHTML = "";
         } else {
-          if (humanSide === "pvp") {
-            status.innerText =
-              (data.turn === 2 ? "King's" : "Pawns'") + " turn (PvP)";
-            showOverlay(false);
-          } else {
-            if (data.turn === humanSide) {
-              status.innerText = "Your turn";
-              showOverlay(false);
-            } else {
-              status.innerText = "AI thinking...";
-              showOverlay(true);
-            }
-          }
+          status.innerText = humanSide === "pvp" ? (data.turn === 2 ? "King's turn" : "Pawns' turn") : (data.turn === humanSide ? "Your turn" : "AI Thinking...");
         }
+        document.getElementById("overlay").style.display = "none";
+        // Always trigger evaluation, but the function handles visibility checks
+        updateEvaluation();
+      }
+
+      function toggleEvalBar() {
+        evalBarVisible = !evalBarVisible;
+        const wrapper = document.getElementById("eval-wrapper");
+        const btn = document.getElementById("evalBarBtn");
+        wrapper.style.display = evalBarVisible ? "flex" : "none";
+        btn.innerText = evalBarVisible ? "Hide Eval Bar" : "Show Eval Bar";
       }
 
       function toggleAnalysis() {
         analysisVisible = !analysisVisible;
-        document.getElementById("analysis").style.display = analysisVisible
-          ? "block"
-          : "none";
-
-        if (analysisVisible) updateEvaluation();
+        const panel = document.getElementById("analysis");
+        const btn = document.getElementById("analysisBtn");
+        
+        if (analysisVisible) {
+          panel.style.visibility = "visible";
+          btn.innerText = "Hide Engine";
+          updateEvaluation();
+        } else {
+          panel.style.visibility = "hidden";
+          btn.innerText = "Show Engine";
+          document.getElementById("arrow-layer").innerHTML = "";
+          document.getElementById("lines").innerHTML = "";
+        }
       }
 
       function updateEvaluation() {
-        fetch("/evaluate")
-          .then((res) => res.json())
-          .then((data) => {
-            document.getElementById("eval").innerText = data.evaluation;
-            updateEvalBar(data.evaluation);
+        fetch("/evaluate").then(res => res.json()).then(data => {
+            // ALWAYS update the bar data in the background
+            updateEvalUI(data.evaluation, data.eval_text);
 
-            if (data.best_move) {
-              const [f, t] = data.best_move;
-
-              const toSq = (p) => String.fromCharCode(97 + p[0]) + (p[1] + 1);
-
-              document.getElementById("bestMove").innerText =
-                `${toSq(f)} → ${toSq(t)}`;
-
-              drawArrow(data.best_move[0], data.best_move[1]);
+            // ONLY update these if Analysis is visible
+            if (analysisVisible) {
+                if (data.best_move && !gameOver) {
+                  document.getElementById("bestMove").innerText = `${toSquare(data.best_move[0])} → ${toSquare(data.best_move[1])}`;
+                  drawArrow(data.best_move[0], data.best_move[1]);
+                } else {
+                  document.getElementById("arrow-layer").innerHTML = "";
+                  document.getElementById("bestMove").innerText = "-";
+                }
+                renderLines(data.lines);
             }
-          });
+        });
       }
     </script>
   </body>

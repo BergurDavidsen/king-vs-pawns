@@ -11,6 +11,14 @@ app.secret_key = os.urandom(24) # Needed for session
 board = Board()
 ai = MinimaxPlayer("AI")
 
+def format_evaluation(val):
+    if val >= 90:
+        return f"Mate in {100 - val}"
+    elif val <= -90:
+        return f"Mate in {-(100 + val)}"
+    else:
+        return str(val)
+
 @app.route('/')
 def index():
     board.reset_board()
@@ -51,16 +59,17 @@ def legal_moves():
 
 @app.route('/evaluate', methods=['GET'])
 def evaluate():
-    # compute evaluation from current board
-    minimax = MinimaxPlayer("minimax")
-
-    value = minimax.minimax(board)
-    best_move = minimax.get_best_move(board)
+    value = ai.minimax(board)
+    best_move = ai.get_best_move(board)
+    lines = ai.get_top_lines(board, depth_limit=4)
 
     return jsonify({
         "evaluation": value,
-        "best_move": best_move
+        "eval_text": format_evaluation(value),
+        "best_move": best_move,
+        "lines": lines
     })
+
 @app.route('/move', methods=['POST'])
 def move():
     if 'human_side' not in session:

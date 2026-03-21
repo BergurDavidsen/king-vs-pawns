@@ -6,5 +6,6 @@ dist/
 wheels/
 *.egg-info
 outputs/
+*.pkl
 # Virtual environments
 .venv

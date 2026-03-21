@@ -90,6 +90,7 @@ def move():
 def get_state():
     moves = board.get_legal_moves()
     winner = board.is_terminal(moves)
+    
     return jsonify({
         'fen': board.to_fen(),
         'turn': board.turn,

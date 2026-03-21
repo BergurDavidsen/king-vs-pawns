@@ -66,8 +66,11 @@ def moves_to_notation(history):
 
 def main():
     b = Board()
-    king_player = MinimaxPlayer("minimax")
-    pawns_player = MinimaxPlayer("minimax")
+    king_player = RandomPlayer("King")
+    pawns_player = MinimaxPlayer("Pawns")
+    
+    #king_player.set_q_table("chess_variant_qtable.json")
+    #pawns_player.set_q_table("chess_variant_qtable.json")
     
     g = Game(king_player, pawns_player)
     
@@ -79,7 +82,8 @@ def main():
     
     print(moves_to_notation(history))
     
-    print(f"{pawns_player.name if result==-1 else king_player.name} wins\nCompute time: {round(end-start, 3)}ms")
+    print(f"{pawns_player.name if result<0 else king_player.name} wins\nCompute time: {round(end-start, 3)}ms")
+    #pawns_player.save_memo()
     b.reset_board()
     
     frames, out_dir = render(b, history)

@@ -15,12 +15,8 @@ def render(b: Board, history):
     
     frames = []
     for i, move in enumerate(history):
-        print("Applying:", move)
-
         success = b.move_piece(*move)
-
-        print("Move success:", success)
-
+        
         fen = b.to_fen()
         board = chess.Board(fen)
         svg = chess.svg.board(board=board)

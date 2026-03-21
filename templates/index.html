@@ -144,6 +144,12 @@
           PvP / Analysis Mode
         </button>
         <button onclick="toggleAnalysis()">Toggle Analysis</button>
+        <button
+          onclick="reset_board()"
+          style="background: #e04a4a; margin-top: 20px"
+        >
+          Reset Game
+        </button>
 
         <div id="status">Choose a side</div>
         <div id="evalbar-container">
@@ -176,6 +182,10 @@
         return (
           "https://chessboardjs.com/img/chesspieces/wikipedia/" + piece + ".png"
         );
+      }
+
+      function reset_board() {
+        location.reload();
       }
 
       function clearHighlights() {

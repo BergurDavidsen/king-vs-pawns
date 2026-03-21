@@ -105,10 +105,10 @@ class Board:
         kx, ky = self.find_king()
         
         if ky == 7:
-            return 1
+            return 100
         
         if len(moves)==0:
-            return -1 if self.turn == self.KING else 1
+            return -100 if self.turn == self.KING else 100
         
         return 0
     def get_state(self):

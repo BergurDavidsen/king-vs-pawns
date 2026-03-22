@@ -119,6 +119,9 @@ def analysis_page():
 def online_play():
     return render_template("online.html")
 
+@app.route("/rules")
+def rules():
+    return render_template("rules.html")
 
 @app.route("/select_side", methods=["POST"])
 def select_side():

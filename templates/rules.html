@@ -1,0 +1,182 @@
+{% extends "base.html" %}
+{% block title %}King vs Pawns — Rules{% endblock %}
+{% block header_tag %}Rules{% endblock %}
+
+{% block content %}
+<div class="container rules-container">
+    <div class="panel rules-panel">
+        <div class="title">Official Rules</div>
+        <h1>King vs Pawns</h1>
+        
+        <p class="intro-text">
+            A minimalist chess variant testing the King's agility against a wall of advancing Pawns. 
+            There are no captures - only movement and positioning.
+        </p>
+
+        <hr class="rules-divider">
+
+        <div class="rules-grid">
+            <section class="rules-section">
+                <div class="section-label">Initial Setup</div>
+                <div class="setup-box">
+                    <p><strong>King:</strong> Starts on <span class="coord">d1</span></p>
+                    <p><strong>Pawns:</strong> Start on <span class="coord">a8, c8, e8, g8</span></p>
+                    <p class="turn-highlight">The King moves first.</p>
+                </div>
+            </section>
+
+            <section class="rules-section">
+                <div class="section-label">Movement</div>
+                <div class="piece-rule">
+                    <h3><span class="dot king-dot"></span> The King</h3>
+                    <p>Moves exactly <strong>one square diagonally</strong> in any direction. It cannot jump or move orthogonally.</p>
+                </div>
+                <div class="piece-rule">
+                    <h3><span class="dot pawn-dot"></span> The Pawns</h3>
+                    <p>Move exactly <strong>one square diagonally forward</strong> (downward). They cannot move sideways or backward.</p>
+                </div>
+            </section>
+
+            <section class="rules-section">
+                <div class="section-label">Winning Conditions</div>
+                <div class="win-card king-win">
+                    <strong>King Wins:</strong> Reaches any square on the 8th rank (Row 7).
+                </div>
+                <div class="win-card pawn-win">
+                    <strong>Pawns Win:</strong> Traps the King so it has no legal moves remaining.
+                </div>
+            </section>
+        </div>
+
+        <div class="control-section" style="margin-top: 30px; text-align: center;">
+            <div class="section-label">Ready to play?</div>
+            <div class="controls-grid" style="max-width: 400px; margin: 0 auto;">
+                <a href="{{ url_for('analysis_page') }}" style="text-decoration: none;">
+                    <button class="primary" style="width: 100%;">Play vs AI</button>
+                </a>
+                <a href="{{ url_for('online_play') }}" style="text-decoration: none;">
+                    <button style="width: 100%;">Play Online</button>
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .rules-container {
+        justify-content: center;
+        max-width: 900px !important;
+    }
+
+    .rules-panel {
+        width: 100%;
+        padding: 40px !important;
+    }
+
+    .rules-panel h1 {
+        margin: 0 0 10px;
+        color: var(--text-bright);
+        font-size: 2rem;
+    }
+
+    .intro-text {
+        color: var(--text-muted);
+        font-size: 1.1rem;
+        line-height: 1.6;
+        margin-bottom: 20px;
+    }
+
+    .rules-divider {
+        border: 0;
+        border-top: 1px solid var(--border);
+        margin: 20px 0 30px;
+    }
+
+    .rules-grid {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 30px;
+    }
+
+    .rules-section {
+        background: var(--bg-deep);
+        padding: 20px;
+        border-radius: 8px;
+        border: 1px solid var(--border-subtle);
+    }
+
+    .setup-box p {
+        margin: 8px 0;
+        font-size: 1rem;
+    }
+
+    .coord {
+        font-family: ui-monospace, monospace;
+        color: var(--accent);
+        font-weight: bold;
+        background: var(--surface);
+        padding: 2px 6px;
+        border-radius: 4px;
+    }
+
+    .turn-highlight {
+        margin-top: 15px !important;
+        color: var(--blue);
+        font-weight: 600;
+        text-transform: uppercase;
+        font-size: 0.8rem;
+        letter-spacing: 0.05em;
+    }
+
+    .piece-rule {
+        margin-bottom: 20px;
+    }
+
+    .piece-rule h3 {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin: 0 0 8px;
+        font-size: 1rem;
+        color: var(--text-bright);
+    }
+
+    .dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+    }
+
+    .king-dot { background: var(--text-bright); box-shadow: 0 0 8px var(--text-bright); }
+    .pawn-dot { background: var(--accent); box-shadow: 0 0 8px var(--accent); }
+
+    .win-card {
+        padding: 12px 15px;
+        border-radius: 6px;
+        margin-bottom: 10px;
+        font-size: 0.95rem;
+        border-left: 4px solid transparent;
+    }
+
+    .king-win {
+        background: var(--blue-dim);
+        border-left-color: var(--blue);
+        color: var(--text-bright);
+    }
+
+    .pawn-win {
+        background: var(--accent-dim);
+        border-left-color: var(--accent);
+        color: var(--text-bright);
+    }
+
+    @media (min-width: 768px) {
+        .rules-grid {
+            grid-template-columns: 1fr 1fr;
+        }
+        .rules-section:last-child {
+            grid-column: span 2;
+        }
+    }
+</style>
+{% endblock %}

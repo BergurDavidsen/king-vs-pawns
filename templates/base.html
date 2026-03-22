@@ -2,7 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <title>{% block title %}Chess variant{% endblock %}</title>
+    <title>{% block title %}King vs Pawns{% endblock %}</title>
     <meta
       name="viewport"
       content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"
@@ -596,6 +596,12 @@
             class="{% if request.endpoint == 'online_play' %}active{% endif %}"
             >Online</a
           >
+          <a
+            href="{{ url_for('rules') }}"
+            class="{% if request.endpoint == 'rules' %}active{% endif %}"
+            >Rules</a
+          >
+
         </nav>
       </div>
       <span class="tag">{% block header_tag %}Play{% endblock %}</span>

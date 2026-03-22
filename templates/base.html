@@ -1,0 +1,611 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>{% block title %}Chess variant{% endblock %}</title>
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"
+    />
+    <meta name="theme-color" content="#1a1a18" />
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    {% block head_scripts %}{% endblock %}
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/chessboard-js/1.0.0/chessboard-1.0.0.min.css"
+    />
+
+    <style>
+      :root {
+        --bg-deep: #1a1a18;
+        --bg-page: #21201d;
+        --surface: #302e2b;
+        --surface-raised: #3d3a36;
+        --border: #474441;
+        --border-subtle: rgba(255, 255, 255, 0.06);
+        --text: #c3c1bd;
+        --text-muted: #8b8987;
+        --text-bright: #f0f0f0;
+        --accent: #81b64c;
+        --accent-dim: rgba(129, 182, 76, 0.22);
+        --blue: #3d70ce;
+        --blue-dim: rgba(75, 129, 232, 0.2);
+        --danger: #e03838;
+        --eval-pct: 50%;
+        --board-frame: #262421;
+      }
+
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        font-family: system-ui, -apple-system, "Segoe UI", Roboto, Ubuntu,
+          "Helvetica Neue", sans-serif;
+        background: var(--bg-page);
+        color: var(--text);
+        font-size: 14px;
+        line-height: 1.45;
+        -webkit-font-smoothing: antialiased;
+      }
+
+      .app-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        flex-wrap: wrap;
+        gap: 10px 16px;
+        padding: 10px 20px;
+        background: var(--bg-deep);
+        border-bottom: 1px solid var(--border-subtle);
+      }
+
+      .header-left {
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 12px 18px;
+      }
+
+      .app-header h1 {
+        margin: 0;
+        font-size: 1rem;
+        font-weight: 600;
+        color: var(--text-bright);
+        letter-spacing: 0.02em;
+      }
+
+      .header-brand {
+        color: inherit;
+        text-decoration: none;
+      }
+
+      .header-brand:hover {
+        color: var(--accent);
+      }
+
+      .app-nav {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+      }
+
+      .app-nav a {
+        color: var(--text-muted);
+        text-decoration: none;
+        font-size: 0.78rem;
+        font-weight: 600;
+        padding: 6px 12px;
+        border-radius: 4px;
+        border: 1px solid transparent;
+      }
+
+      .app-nav a:hover {
+        color: var(--text-bright);
+        background: var(--surface);
+        border-color: var(--border);
+      }
+
+      .app-nav a.active {
+        color: var(--accent);
+        border-color: var(--border);
+        background: var(--surface);
+      }
+
+      .app-header .tag {
+        font-size: 0.7rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.12em;
+        color: var(--text-muted);
+        padding: 4px 10px;
+        border-radius: 999px;
+        border: 1px solid var(--border);
+        background: var(--surface);
+      }
+
+      .container {
+        display: flex;
+        gap: 0;
+        padding: 16px 20px 24px;
+        max-width: 1280px;
+        margin: 0 auto;
+        align-items: flex-start;
+        flex-wrap: wrap;
+      }
+
+      .panel {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        padding: 14px 14px 16px;
+        display: flex;
+        flex-direction: column;
+        flex-shrink: 0;
+      }
+
+      .panel-left {
+        width: 260px;
+        margin-right: 16px;
+      }
+
+      .panel-right {
+        width: 300px;
+        margin-left: 16px;
+        min-height: 120px;
+      }
+
+      .panel .title {
+        color: var(--text-muted);
+        font-weight: 600;
+        margin: 0 0 12px;
+        font-size: 0.65rem;
+        text-transform: uppercase;
+        letter-spacing: 0.14em;
+      }
+
+      #status {
+        margin: 0 0 14px;
+        padding: 10px 12px;
+        background: var(--bg-deep);
+        border-radius: 4px;
+        text-align: center;
+        font-weight: 600;
+        font-size: 0.9rem;
+        color: var(--text-bright);
+        border: 1px solid var(--border-subtle);
+        border-left: 3px solid var(--blue);
+      }
+
+      #status .winner {
+        color: var(--accent);
+      }
+
+      .control-section {
+        margin-bottom: 16px;
+      }
+
+      .control-section:last-child {
+        margin-bottom: 0;
+      }
+
+      .section-label {
+        font-size: 0.62rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.12em;
+        color: var(--text-muted);
+        margin: 0 0 8px;
+      }
+
+      .controls-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+      }
+
+      .controls-grid.single {
+        grid-template-columns: 1fr;
+      }
+
+      button {
+        margin: 0;
+        padding: 10px 12px;
+        border: 1px solid var(--border);
+        border-radius: 4px;
+        background: linear-gradient(180deg, var(--surface-raised) 0%, var(--surface) 100%);
+        color: var(--text-bright);
+        font-weight: 600;
+        font-size: 0.8rem;
+        cursor: pointer;
+        
+      }
+
+      button:hover {
+        background: var(--surface-raised);
+       
+      }
+
+      button:active {
+        transform: translateY(1px);
+      }
+
+      button.primary {
+        background: linear-gradient(180deg, #5a8eef 0%, var(--blue) 100%);
+        border-color: #6a9af0;
+      }
+
+      button.primary:hover {
+        background: #5a8eef;
+      }
+
+      button.danger {
+        background: linear-gradient(180deg, #e87070 0%, var(--danger) 100%);
+        border-color: #e87070;
+      }
+
+      button.danger:hover {
+        background: #e87070;
+      }
+
+      button#analysisBtn.engine-on {
+        background: var(--accent-dim);
+        border-color: var(--accent);
+        color: var(--accent);
+      }
+
+      .board-column {
+        flex: 1;
+        min-width: 280px;
+        max-width: min(72vmin, 760px);
+        display: flex;
+        flex-direction: row;
+        align-items: stretch;
+        gap: 10px;
+      }
+
+      .eval-rail {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 8px;
+        flex-shrink: 0;
+      }
+
+      .eval-track {
+        flex: 1;
+        width: 22px;
+        min-height: 180px;
+        background: #0d0d0c;
+        border-radius: 4px;
+        border: 1px solid var(--border);
+        overflow: hidden;
+        position: relative;
+        display: flex;
+        flex-direction: column;
+        justify-content: flex-end;
+        align-self: stretch;
+      }
+
+      #evalbar {
+        width: 100%;
+        height: var(--eval-pct);
+        min-height: 0;
+        background: linear-gradient(180deg, #f5f5f5 0%, #d8d8d8 100%);
+        transition: height 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+        border-radius: 0 0 3px 3px;
+      }
+
+      #eval-text-inside {
+        font-size: 0.72rem;
+        font-weight: 700;
+        font-variant-numeric: tabular-nums;
+        color: var(--text-bright);
+        text-align: center;
+        min-width: 2.5rem;
+        padding: 4px 6px;
+        background: var(--bg-deep);
+        border-radius: 4px;
+        border: 1px solid var(--border);
+      }
+
+      #board-container {
+        position: relative;
+        flex: 1;
+        border-radius: 4px;
+        padding: 8px;
+        background: var(--board-frame);
+        border: 1px solid var(--border);
+        box-shadow: 0 4px 24px rgba(0, 0, 0, 0.35);
+      }
+
+      #board {
+        width: 100%;
+        border-radius: 3px;
+        overflow: hidden;
+      }
+
+      .selected-square {
+        background: rgba(129, 182, 76, 0.45) !important;
+      }
+
+      .highlight {
+        background: radial-gradient(
+          circle,
+          rgba(255, 255, 255, 0.35) 22%,
+          transparent 28%
+        ) !important;
+      }
+
+      /* Engine panel (lichess / chess.com style) */
+      .best-row {
+        display: flex;
+        align-items: baseline;
+        gap: 8px;
+        flex-wrap: wrap;
+        padding: 10px 12px;
+        margin-bottom: 12px;
+        background: var(--bg-deep);
+        border-radius: 4px;
+        border: 1px solid var(--border-subtle);
+      }
+
+      .best-row .label {
+        font-size: 0.65rem;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        color: var(--text-muted);
+        font-weight: 600;
+      }
+
+      #bestMove {
+        font-family: ui-monospace, "Cascadia Code", "SF Mono", Menlo, Consolas,
+          monospace;
+        font-size: 0.95rem;
+        font-weight: 600;
+        color: var(--accent);
+      }
+
+      .stat-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 8px 0;
+        border-bottom: 1px solid var(--border-subtle);
+        font-size: 0.85rem;
+      }
+
+      .stat-row:last-of-type {
+        border-bottom: none;
+      }
+
+      .stat-row .k {
+        color: var(--text-muted);
+      }
+
+      #eval {
+        font-family: ui-monospace, Menlo, Consolas, monospace;
+        font-weight: 600;
+        color: var(--text-bright);
+      }
+
+      .lines-header {
+        font-size: 0.65rem;
+        text-transform: uppercase;
+        letter-spacing: 0.12em;
+        color: var(--text-muted);
+        font-weight: 600;
+        margin: 14px 0 8px;
+      }
+
+      #lines {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        max-height: min(42vh, 420px);
+        overflow-y: auto;
+        padding-right: 4px;
+      }
+
+      #lines::-webkit-scrollbar {
+        width: 6px;
+      }
+
+      #lines::-webkit-scrollbar-thumb {
+        background: var(--border);
+        border-radius: 3px;
+      }
+
+      .pv-line {
+        display: grid;
+        grid-template-columns: 22px 52px 1fr;
+        gap: 8px;
+        align-items: start;
+        padding: 6px 8px;
+        border-radius: 4px;
+        background: var(--bg-deep);
+        border: 1px solid transparent;
+        font-size: 0.78rem;
+        line-height: 1.35;
+      }
+
+      .pv-line.pv-best {
+        border-color: var(--accent);
+        background: var(--accent-dim);
+      }
+
+      .pv-idx {
+        color: var(--text-muted);
+        font-weight: 600;
+        font-variant-numeric: tabular-nums;
+      }
+
+      .pv-score {
+        font-family: ui-monospace, Menlo, Consolas, monospace;
+        font-weight: 600;
+        color: var(--blue);
+        text-align: right;
+      }
+
+      .pv-moves {
+        font-family: ui-monospace, Menlo, Consolas, monospace;
+        color: var(--text);
+        word-break: break-word;
+      }
+
+      #overlay {
+        position: absolute;
+        inset: 8px;
+        background: rgba(26, 26, 24, 0.72);
+        backdrop-filter: blur(4px);
+        display: none;
+        justify-content: center;
+        align-items: center;
+        z-index: 100;
+        color: var(--text-bright);
+        font-weight: 600;
+        font-size: 0.95rem;
+        border-radius: 3px;
+      }
+
+      #analysis.panel-hidden {
+        display: none;
+      }
+
+      @media (max-width: 960px) {
+        .container {
+          flex-direction: column;
+          padding: 12px;
+        }
+
+        .panel-left,
+        .panel-right {
+          width: 100%;
+          margin: 0;
+        }
+
+        .panel-left {
+          order: 2;
+        }
+
+        .board-column {
+          order: 1;
+          max-width: 100%;
+          width: 100%;
+          flex-direction: column;
+        }
+
+        .eval-rail {
+          flex-direction: row;
+          width: 100%;
+          align-items: center;
+        }
+
+        .eval-track {
+          flex: 1;
+          width: auto;
+          min-height: 14px;
+          height: 14px;
+          flex-direction: row;
+          justify-content: flex-start;
+          align-items: stretch;
+        }
+
+        #evalbar {
+          height: 100%;
+          width: var(--eval-pct);
+          border-radius: 0 3px 3px 0;
+        }
+
+        #eval-text-inside {
+          flex-shrink: 0;
+        }
+
+        .panel-right {
+          order: 3;
+        }
+      }
+
+      @media (max-width: 520px) {
+        .controls-grid {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      .online-code-row {
+        margin-top: 10px;
+        padding: 8px 10px;
+        background: var(--bg-deep);
+        border-radius: 4px;
+        border: 1px solid var(--border-subtle);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+      }
+
+      .online-code-row code {
+        font-family: ui-monospace, monospace;
+        font-size: 1rem;
+        font-weight: 700;
+        letter-spacing: 0.12em;
+        color: var(--accent);
+      }
+
+      .online-join-row {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        gap: 8px;
+        margin-top: 10px;
+      }
+
+      #onlineJoinInput {
+        margin: 0;
+        padding: 10px 12px;
+        border: 1px solid var(--border);
+        border-radius: 4px;
+        background: var(--bg-deep);
+        color: var(--text-bright);
+        font-size: 0.85rem;
+        text-transform: uppercase;
+      }
+
+      #onlineJoinInput::placeholder {
+        text-transform: none;
+        color: var(--text-muted);
+      }
+    </style>
+  </head>
+
+  <body>
+    <header class="app-header">
+      <div class="header-left">
+        <h1><a class="header-brand" href="{{ url_for('analysis_page') }}">Chess variant</a></h1>
+        <nav class="app-nav" aria-label="Sections">
+          <a
+            href="{{ url_for('analysis_page') }}"
+            class="{% if request.endpoint == 'analysis_page' %}active{% endif %}"
+            >Analysis</a
+          >
+          <a
+            href="{{ url_for('online_play') }}"
+            class="{% if request.endpoint == 'online_play' %}active{% endif %}"
+            >Online</a
+          >
+        </nav>
+      </div>
+      <span class="tag">{% block header_tag %}Play{% endblock %}</span>
+    </header>
+
+    {% block content %}{% endblock %}
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/chessboard-js/1.0.0/chessboard-1.0.0.min.js"></script>
+
+    {% block page_scripts %}{% endblock %}
+  </body>
+</html>
+

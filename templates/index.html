@@ -237,6 +237,7 @@
           <button class="primary" onclick="pickSide(2)">Play as King</button>
           <button class="primary" onclick="pickSide(1)">Play as Pawns</button>
           <button class="success" onclick="pickSide('pvp')">PvP Mode</button>
+          <button class="success" onclick="undoMove()">Undo Move</button>
           <button id="analysisBtn" onclick="toggleAnalysis()">Engine</button>
           <button id="evalBarBtn" onclick="toggleEvalBar()">Eval Bar</button>
           <button class="danger" onclick="reset_board()">Reset</button>
@@ -325,6 +326,21 @@
           })
           .catch(() => {
             document.getElementById("overlay").style.display = "none";
+            removeHighlights();
+          });
+      }
+
+      function undoMove() {
+        fetch("/undo", {
+          method: "POST",
+        })
+          .then((res) => res.json())
+          .then((data) => {
+            gameOver = false;
+            updateUI(data);
+            removeHighlights()
+          })
+          .catch(() => {
             removeHighlights();
           });
       }
@@ -506,26 +522,39 @@
 
       function drawArrow(from, to) {
         if (!analysisVisible) return;
-        const svg = document.getElementById("arrow-layer");
-        svg.innerHTML = `<defs><marker id="arrowhead" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto"><polygon points="0 0, 10 3.5, 0 7" fill="rgba(110, 224, 74, 0.8)" /></marker></defs>`;
         const boardEl = document.getElementById("board");
-        const sqSize = boardEl.offsetWidth / 8;
+        const svg = document.getElementById("arrow-layer");
+
+        // Sync SVG size to the current board size
+        const bWidth = boardEl.offsetWidth;
+        const bHeight = boardEl.offsetHeight;
+        svg.setAttribute("width", bWidth);
+        svg.setAttribute("height", bHeight);
+
+        // Guard against zero-width (happens if called while board is hidden/initializing)
+        if (bWidth === 0) return;
+
+        const sqSize = bWidth / 8;
+
+        // Standard chessboard-js coordinates:
+        // x: 0 is 'a', 7 is 'h'
+        // y: 0 is '1' (bottom), 7 is '8' (top)
         const fx = from[0] * sqSize + sqSize / 2;
         const fy = (7 - from[1]) * sqSize + sqSize / 2;
         const tx = to[0] * sqSize + sqSize / 2;
         const ty = (7 - to[1]) * sqSize + sqSize / 2;
-        const line = document.createElementNS(
-          "http://www.w3.org/2000/svg",
-          "line",
-        );
-        line.setAttribute("x1", fx);
-        line.setAttribute("y1", fy);
-        line.setAttribute("x2", tx);
-        line.setAttribute("y2", ty);
-        line.setAttribute("stroke", "rgba(110, 224, 74, 0.8)");
-        line.setAttribute("stroke-width", "8");
-        line.setAttribute("marker-end", "url(#arrowhead)");
-        svg.appendChild(line);
+
+        svg.innerHTML = `
+    <defs>
+      <marker id="arrowhead" markerWidth="10" markerHeight="7" 
+              refX="10" refY="3.5" orient="auto">
+        <polygon points="0 0, 10 3.5, 0 7" fill="rgba(110, 224, 74, 0.8)" />
+      </marker>
+    </defs>
+    <line x1="${fx}" y1="${fy}" x2="${tx}" y2="${ty}" 
+          stroke="rgba(110, 224, 74, 0.8)" stroke-width="8" 
+          marker-end="url(#arrowhead)" />
+  `;
       }
 
       function pickSide(side) {

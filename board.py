@@ -11,6 +11,8 @@ class Board:
             (-1, 1), (-1, -1)
         ]
         self.turn = self.KING
+        self.history = []
+
         
     def index(self, x, y):
         return y*8+x
@@ -24,6 +26,15 @@ class Board:
         new_board.turn = self.turn
         return new_board
     
+    def undo(self):
+        if not self.history:
+            return False
+        
+        old_board, old_turn = self.history.pop()
+        self.board = old_board
+        self.turn = old_turn
+        return True
+        
     def set_piece(self, x, y, v):
         self.board[self.index(x, y)] = v
 
@@ -94,6 +105,8 @@ class Board:
         if (from_pos, to_pos) not in legal_moves:
             return False
         
+        self.history.append((self.board[:], self.turn))
+        
         self.set_piece(tx, ty, piece)
         self.set_piece(fx, fy, self.EMPTY)
         
@@ -128,6 +141,7 @@ class Board:
         
         self.board = b.board[:]
         self.turn = self.KING
+        self.history = []
 
     def print_board(self):
        for y in range(7, -1, -1):

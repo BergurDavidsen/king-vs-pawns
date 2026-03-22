@@ -106,5 +106,11 @@ def get_state():
         'winner': winner,
         'human_side': session.get('human_side')
     })
+@app.route("/undo", methods=['POST'])
+def undo_move():
+    board.undo()
+    
+    return get_state()
+    
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(host="0.0.0.0", port=8000, debug=True)

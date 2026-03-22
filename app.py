@@ -11,7 +11,7 @@ from game.players.minimax_player import MinimaxPlayer
 app = Flask(__name__)
 app.secret_key = os.urandom(24)  # Needed for session
 
-socketio = SocketIO(app, cors_allowed_origins="*")
+socketio = SocketIO(app, cors_allowed_origins="*", async_mode='gevent')
 
 board = Board()
 ai = MinimaxPlayer("AI")
@@ -420,4 +420,4 @@ def sync_online():
 
 
 if __name__ == "__main__":
-    socketio.run(app, host="0.0.0.0", port=8000, debug=True, allow_unsafe_werkzeug=True)
+    socketio.run(app, host="0.0.0.0", port=8000, debug=False)

@@ -114,15 +114,18 @@ header_tag %}Online{% endblock %} {% block content %}
 <script>
   const INITIAL_FEN = "p1p1p1p1/8/8/8/8/8/8/3K4 w - - 0 1";
 
-  const socket = io();
-
+  const socket = io({
+    transports: ["websocket"],
+    upgrade: false,
+  });
+  
   let humanSide = null;
   let gameOver = false;
   let selectedSquare = null;
   let waitingForOpponent = false;
 
   let plyLog = []; // This will hold our move history for saving/analysis
-  
+
   socket.on("connect", () => {
     document.getElementById("overlay").style.display = "none";
     board.position(INITIAL_FEN);

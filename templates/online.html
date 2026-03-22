@@ -1,0 +1,352 @@
+{% extends "base.html" %}
+{% block head_scripts %}
+    <script src="https://cdn.socket.io/4.8.1/socket.io.min.js"></script>
+{% endblock %}
+{% block title %}Chess variant — Online{% endblock %}
+{% block header_tag %}Online{% endblock %}
+{% block content %}
+    <div class="container">
+      <aside class="panel panel-left">
+        <div class="title">Online game</div>
+        <div id="status">Host a game or join with a code.</div>
+
+        <div class="control-section">
+          <div class="section-label">Match</div>
+          <p
+            style="
+              margin: 0 0 10px;
+              font-size: 0.72rem;
+              color: var(--text-muted);
+              line-height: 1.4;
+            "
+          >
+            Two browsers on this server. Host shares the code; guest joins.
+            Host plays King, guest plays Pawns.
+          </p>
+          <div class="controls-grid single">
+            <button type="button" onclick="hostOnlineGame()">Host game</button>
+          </div>
+          <div class="online-code-row">
+            <span
+              style="
+                font-size: 0.62rem;
+                font-weight: 600;
+                text-transform: uppercase;
+                letter-spacing: 0.1em;
+                color: var(--text-muted);
+              "
+              >Code</span
+            >
+            <code id="onlineCodeDisplay">—</code>
+          </div>
+          <div class="online-join-row">
+            <input
+              type="text"
+              id="onlineJoinInput"
+              placeholder="Enter code"
+              maxlength="8"
+              autocomplete="off"
+            />
+            <button type="button" onclick="joinOnlineGame()">Join</button>
+          </div>
+          <div class="controls-grid single" style="margin-top: 10px">
+            <button type="button" onclick="leaveOnlineGame()">
+              Leave online game
+            </button>
+          </div>
+        </div>
+
+        <p
+          style="
+            margin: 0 0 12px;
+            font-size: 0.72rem;
+            color: var(--text-muted);
+            line-height: 1.4;
+          "
+        >
+          Vs AI and engine analysis are on the
+          <a href="{{ url_for('analysis_page') }}" style="color: var(--blue)"
+            >Analysis</a
+          >
+          page.
+        </p>
+
+        <div class="control-section">
+          <div class="section-label">Board</div>
+          <div class="controls-grid single">
+            <button type="button" class="danger" onclick="reset_board()">
+              Reload page
+            </button>
+          </div>
+        </div>
+      </aside>
+
+      <div class="board-column">
+        <div id="board-container">
+          <div id="board"></div>
+          <svg
+            id="arrow-layer"
+            width="500"
+            height="500"
+            style="
+              position: absolute;
+              top: 8px;
+              left: 8px;
+              pointer-events: none;
+              z-index: 10;
+            "
+          ></svg>
+          <div id="overlay">Connecting…</div>
+        </div>
+      </div>
+    </div>
+{% endblock %}
+{% block page_scripts %}
+    <script>
+      const INITIAL_FEN =
+        "p1p1p1p1/8/8/8/8/8/8/3K4 w - - 0 1";
+
+      const socket = io();
+
+      let humanSide = null;
+      let gameOver = false;
+      let selectedSquare = null;
+      let waitingForOpponent = false;
+
+      socket.on("connect", () => {
+        document.getElementById("overlay").style.display = "none";
+        board.position(INITIAL_FEN);
+      });
+
+      socket.on("online_state", (data) => {
+        updateUI(data);
+      });
+
+      socket.on("online_room_code", ({ room_code }) => {
+        const el = document.getElementById("onlineCodeDisplay");
+        if (el) el.textContent = room_code;
+      });
+
+      socket.on("online_error", ({ message }) => {
+        document.getElementById("overlay").style.display = "none";
+        document.getElementById("status").textContent = message || "Error";
+      });
+
+      socket.on("online_peer_left", () => {
+        document.getElementById("overlay").style.display = "none";
+        humanSide = null;
+        gameOver = false;
+        waitingForOpponent = false;
+        document.getElementById("onlineCodeDisplay").textContent = "—";
+        board.position(INITIAL_FEN);
+        removeHighlights();
+        document.getElementById("status").textContent =
+          "Opponent left — host again or join another game.";
+      });
+
+      function hostOnlineGame() {
+        document.getElementById("overlay").style.display = "flex";
+        socket.emit("online_create");
+      }
+
+      function joinOnlineGame() {
+        const raw = document.getElementById("onlineJoinInput").value.trim();
+        if (!raw) {
+          document.getElementById("status").textContent = "Enter a game code.";
+          return;
+        }
+        document.getElementById("overlay").style.display = "flex";
+        socket.emit("online_join", { room_code: raw });
+      }
+
+      function leaveOnlineGame() {
+        socket.emit("online_leave");
+        humanSide = null;
+        gameOver = false;
+        waitingForOpponent = false;
+        document.getElementById("onlineCodeDisplay").textContent = "—";
+        board.position(INITIAL_FEN);
+        removeHighlights();
+        document.getElementById("status").textContent =
+          "Left online game — host or join when ready.";
+        document.getElementById("overlay").style.display = "none";
+      }
+
+      function pieceTheme(piece) {
+        return (
+          "https://chessboardjs.com/img/chesspieces/wikipedia/" + piece + ".png"
+        );
+      }
+      function reset_board() {
+        location.reload();
+      }
+      function toSquare(pos) {
+        return String.fromCharCode(97 + pos[0]) + (pos[1] + 1);
+      }
+
+      function removeHighlights() {
+        document.querySelectorAll("[data-square]").forEach((el) => {
+          el.classList.remove("selected-square");
+          el.classList.remove("highlight");
+        });
+
+        selectedSquare = null;
+      }
+
+      function makeMove(source, target) {
+        if (!source || !target || source === target) return;
+        if (humanSide === null || waitingForOpponent) return;
+
+        const from = [
+          source.charCodeAt(0) - 97,
+          parseInt(source[1]) - 1,
+        ];
+        const to = [
+          target.charCodeAt(0) - 97,
+          parseInt(target[1]) - 1,
+        ];
+
+        document.getElementById("overlay").style.display = "flex";
+        socket.emit("online_move", { from, to });
+        removeHighlights();
+      }
+
+      function highlightSquares(squares) {
+        squares.forEach((pos) => {
+          const square = toSquare(pos);
+
+          const el = document.querySelector(`[data-square="${square}"]`);
+          if (el) el.classList.add("highlight");
+        });
+      }
+
+      function requestLegalMoves(x, y) {
+        socket.emit("online_legal", { pos: [x, y] }, (res) => {
+          if (res && res.moves) highlightSquares(res.moves);
+        });
+      }
+
+      const board = Chessboard("board", {
+        draggable: false,
+        pieceTheme: pieceTheme,
+        onDragStart: function (source, piece) {
+          if (gameOver || humanSide === null || waitingForOpponent)
+            return false;
+          if (
+            (humanSide === 2 && piece.search(/^b/) !== -1) ||
+            (humanSide === 1 && piece.search(/^w/) !== -1)
+          )
+            return false;
+          removeHighlights();
+        },
+        onDrop: function (source, target) {
+          if (source === target || target === "offboard") return;
+          makeMove(source, target);
+        },
+        onSnapEnd: function () {
+          board.position(board.fen());
+        },
+      });
+
+      let lastTapTime = 0;
+
+      function handleSquareClick() {
+        const now = Date.now();
+
+        if (now - lastTapTime < 120) return;
+        lastTapTime = now;
+
+        if (gameOver || humanSide === null || waitingForOpponent) return;
+
+        const square = $(this).attr("data-square");
+        const piece = board.position()[square];
+
+        const x = square.charCodeAt(0) - 97;
+        const y = parseInt(square[1]) - 1;
+
+        if (selectedSquare === square) {
+          removeHighlights();
+          return;
+        }
+
+        if (selectedSquare) {
+          if (piece) {
+            const isWhite = piece.startsWith("w");
+
+            const canSelect =
+              (humanSide === 2 && isWhite) || (humanSide === 1 && !isWhite);
+
+            if (canSelect) {
+              removeHighlights();
+              selectedSquare = square;
+
+              document
+                .querySelector(`[data-square="${square}"]`)
+                ?.classList.add("selected-square");
+
+              requestLegalMoves(x, y);
+
+              return;
+            }
+          }
+
+          makeMove(selectedSquare, square);
+          return;
+        }
+
+        if (piece) {
+          const isWhite = piece.startsWith("w");
+
+          const canSelect =
+            (humanSide === 2 && isWhite) || (humanSide === 1 && !isWhite);
+
+          if (!canSelect) return;
+
+          removeHighlights();
+          selectedSquare = square;
+
+          document
+            .querySelector(`[data-square="${square}"]`)
+            ?.classList.add("selected-square");
+
+          requestLegalMoves(x, y);
+        }
+      }
+
+      let isTouch = false;
+
+      $("#board")
+        .on("touchstart", "[class*='square-']", function (e) {
+          isTouch = true;
+          handleSquareClick.call(this, e);
+        })
+        .on("mousedown", "[class*='square-']", function (e) {
+          if (isTouch) return;
+          handleSquareClick.call(this, e);
+        });
+
+      window.addEventListener("resize", () => board.resize());
+
+      function updateUI(data) {
+        board.position(data.fen);
+        humanSide = data.human_side;
+        waitingForOpponent = !!data.waiting_for_opponent;
+
+        const status = document.getElementById("status");
+        if (data.winner !== 0) {
+          gameOver = true;
+          status.innerHTML = `<span class="winner">${data.winner > 0 ? "King wins" : "Pawns win"}</span>`;
+          document.getElementById("arrow-layer").innerHTML = "";
+        } else if (waitingForOpponent) {
+          gameOver = false;
+          status.textContent =
+            "Waiting for opponent — share the game code (you play King).";
+        } else if (typeof humanSide === "number") {
+          gameOver = false;
+          status.textContent =
+            data.turn === humanSide ? "Your move" : "Opponent's move…";
+        }
+        document.getElementById("overlay").style.display = "none";
+      }
+    </script>
+{% endblock %}

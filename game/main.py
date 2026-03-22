@@ -1,13 +1,11 @@
 import os
 import time
 
-from board import Board
-from game import Game
-from human_player import HumanPlayer
-from minimax_player import MinimaxPlayer
-from random_player import RandomPlayer
-from renderer import render
-from svg_to_gif import create_gif
+from game.board import Board
+from game.game import Game
+from game.players.minimax_player import MinimaxPlayer
+from game.players.random_player import RandomPlayer
+
 
 def explore_states(board:Board, seen_states):
     state = (tuple(board.board), board.turn)
@@ -75,18 +73,29 @@ def main():
     g = Game(king_player, pawns_player)
     
     b.reset_board()
+    
+    b.move_piece((3, 0), (4,1))
+    
+    b.print_board()
+    
+    b.undo()
+    
+    print()
+    
+    b.print_board()
 
-    start = time.time()
-    history, result = g.play_optimal_game(b)
-    end = time.time()
+
+    # start = time.time()
+    # history, result = g.play_optimal_game(b)
+    # end = time.time()
     
-    print(moves_to_notation(history))
+    # print(moves_to_notation(history))
     
-    print(f"{pawns_player.name if result<0 else king_player.name} wins\nCompute time: {round(end-start, 3)}ms")
-    #pawns_player.save_memo()
-    b.reset_board()
+    # print(f"{pawns_player.name if result<0 else king_player.name} wins\nCompute time: {round(end-start, 3)}ms")
+    # #pawns_player.save_memo()
+    # b.reset_board()
     
-    frames, out_dir = render(b, history)
+    # frames, out_dir = render(b, history)
     
     # png_files = convert_svgs_to_pngs(frames, out_dir)
     

@@ -1,5 +1,5 @@
-from game import Board
-from player import Player
+from game.board import Board
+from game.players.player import Player
 import random
 
 class RandomPlayer(Player):

@@ -2,8 +2,8 @@ import math
 import pickle
 import os
 import time
-from game import Board
-from player import Player
+from game.board import Board
+from game.players.player import Player
 
 class MinimaxPlayer(Player):
     def __init__(self, name, memo_file="minimax_memo.pkl"):

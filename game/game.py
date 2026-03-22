@@ -1,5 +1,5 @@
 from board import Board
-from player import Player
+from game.players.player import Player
   
 class Game:
     def __init__(self, king_player:Player, pawns_player:Player):

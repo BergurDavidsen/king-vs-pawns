@@ -1,8 +1,8 @@
 from flask import Flask, render_template, jsonify, request, session
 import os
 
-from game import Board
-from minimax_player import MinimaxPlayer
+from game.board import Board
+from game.players.minimax_player import MinimaxPlayer
 
 
 app = Flask(__name__)

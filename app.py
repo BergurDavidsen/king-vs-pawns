@@ -4,6 +4,7 @@ import os
 import secrets
 
 from game.board import Board
+from game.game_analysis import analyze_game, normalize_moves
 from game.players.minimax_player import MinimaxPlayer
 
 
@@ -27,7 +28,7 @@ def _new_room_code() -> str:
 
 
 def state_for_player(
-    b: Board, your_side: int, *, waiting_for_opponent: bool = False
+    b: Board, your_side: int, *, waiting_for_opponent: bool = False, history:list
 ) -> dict:
     moves = b.get_legal_moves()
     winner = b.is_terminal(moves)
@@ -38,6 +39,7 @@ def state_for_player(
         "human_side": your_side,
         "waiting_for_opponent": waiting_for_opponent,
         "online": True,
+        "history": history if history is not None else []
     }
 
 
@@ -46,19 +48,20 @@ def broadcast_online_state(room_code: str) -> None:
     if not g:
         return
     b = g["board"]
+    history = g.get("ply_log", [])
     king_sid = g.get("king_sid")
     pawn_sid = g.get("pawn_sid")
     waiting = pawn_sid is None
     if king_sid:
         socketio.emit(
             "online_state",
-            state_for_player(b, Board.KING, waiting_for_opponent=waiting),
+            state_for_player(b, Board.KING, waiting_for_opponent=waiting, history=history),
             room=king_sid,
         )
     if pawn_sid:
         socketio.emit(
             "online_state",
-            state_for_player(b, Board.PAWN, waiting_for_opponent=False),
+            state_for_player(b, Board.PAWN, waiting_for_opponent=False, history=history),
             room=pawn_sid,
         )
 
@@ -86,7 +89,7 @@ def leave_online_room(sid: str) -> None:
             socketio.emit("online_peer_left", {}, room=king)
             socketio.emit(
                 "online_state",
-                state_for_player(nb, Board.KING, waiting_for_opponent=True),
+                state_for_player(nb, Board.KING, waiting_for_opponent=True, history=[]),
                 room=king,
             )
 
@@ -108,6 +111,7 @@ def index():
 @app.route("/analysis")
 def analysis_page():
     board.reset_board()
+    session.pop("ply_log", None)
     return render_template("analysis.html")
 
 
@@ -121,6 +125,7 @@ def select_side():
     data = request.json
     side = data.get("side")  # 2, 1, or 'pvp'
     board.reset_board()
+    session["ply_log"] = []
 
     if side == "pvp":
         session["human_side"] = "pvp"
@@ -131,6 +136,9 @@ def select_side():
             ai_move = ai.get_best_move(board)
             if ai_move:
                 board.move_piece(*ai_move)
+                session["ply_log"] = session["ply_log"] + [
+                    {"from": list(ai_move[0]), "to": list(ai_move[1])}
+                ]
 
     return get_state()
 
@@ -179,12 +187,20 @@ def move():
 
     # Execute Move
     if board.move_piece(from_pos, to_pos):
+        log = list(session.get("ply_log", []))
+        log.append({"from": list(from_pos), "to": list(to_pos)})
+        session["ply_log"] = log
         res = board.is_terminal(board.get_legal_moves())
         # Only trigger AI if NOT in PvP mode and game isn't over
         if not is_pvp and res == 0:
             ai_move = ai.get_best_move(board)
             if ai_move:
                 board.move_piece(*ai_move)
+                log = list(session["ply_log"])
+                log.append(
+                    {"from": list(ai_move[0]), "to": list(ai_move[1])}
+                )
+                session["ply_log"] = log
 
     return get_state()
 
@@ -200,6 +216,7 @@ def get_state():
             "turn": board.turn,
             "winner": winner,
             "human_side": session.get("human_side"),
+            "ply_log": session.get("ply_log", []),
         }
     )
 
@@ -207,8 +224,64 @@ def get_state():
 @app.route("/undo", methods=["POST"])
 def undo_move():
     board.undo()
+    log = session.get("ply_log")
+    if log:
+        session["ply_log"] = log[:-1]
 
     return get_state()
+
+
+@app.post("/game/load")
+def game_load():
+    data = request.get_json(silent=True) or {}
+    raw = data.get("moves", [])
+    try:
+        moves = normalize_moves(raw)
+    except (KeyError, TypeError, IndexError, ValueError):
+        return jsonify({"error": "Invalid moves format (need from/to arrays)."}), 400
+
+    board.reset_board()
+    for m in moves:
+        f, t = tuple(m["from"]), tuple(m["to"])
+        if not board.move_piece(f, t):
+            return jsonify({"error": "Illegal move in saved game."}), 400
+
+    session["ply_log"] = moves
+    session["human_side"] = "pvp"
+    return get_state()
+
+
+@app.get("/game/export")
+def game_export():
+    return jsonify(
+        {
+            "version": 1,
+            "variant": "king-vs-pawn",
+            "moves": session.get("ply_log", []),
+        }
+    )
+
+
+@app.post("/game/analyze")
+def game_analyze():
+    data = request.get_json(silent=True) or {}
+    raw = data.get("moves")
+    if raw is None:
+        raw = session.get("ply_log", [])
+    try:
+        moves = normalize_moves(raw)
+    except (KeyError, TypeError, IndexError, ValueError):
+        return jsonify({"error": "Invalid moves format."}), 400
+
+    if not moves:
+        return jsonify({"error": "No moves to analyze."}), 400
+
+    try:
+        steps = analyze_game(ai, moves)
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+
+    return jsonify({"steps": steps})
 
 
 @socketio.on("online_create")
@@ -220,12 +293,12 @@ def on_online_create():
         code = _new_room_code()
     b = Board()
     b.reset_board()
-    online_games[code] = {"board": b, "king_sid": sid, "pawn_sid": None}
+    online_games[code] = {"board": b, "king_sid": sid, "pawn_sid": None, "ply_log": []}
     sid_to_room[sid] = code
     join_room(f"game_{code}")
     emit(
         "online_state",
-        state_for_player(b, Board.KING, waiting_for_opponent=True),
+        state_for_player(b, Board.KING, waiting_for_opponent=True, history=[]),
     )
     emit("online_room_code", {"room_code": code})
 
@@ -251,10 +324,10 @@ def on_online_join(data):
     sid_to_room[sid] = code
     join_room(f"game_{code}")
     b = g["board"]
-    emit("online_state", state_for_player(b, Board.PAWN, waiting_for_opponent=False))
+    emit("online_state", state_for_player(b, Board.PAWN, waiting_for_opponent=False, history=[]))
     socketio.emit(
         "online_state",
-        state_for_player(b, Board.KING, waiting_for_opponent=False),
+        state_for_player(b, Board.KING, waiting_for_opponent=False, history=[]),
         room=g["king_sid"],
     )
 
@@ -287,10 +360,12 @@ def on_online_move(data):
     payload = data or {}
     from_pos = tuple(payload["from"])
     to_pos = tuple(payload["to"])
-    if not b.move_piece(from_pos, to_pos):
+    
+    if b.move_piece(from_pos, to_pos):
+        g["ply_log"].append({"from": list(from_pos), "to": list(to_pos)})
+        broadcast_online_state(room)
+    else:
         emit("online_error", {"message": "Illegal move."})
-        return
-    broadcast_online_state(room)
 
 
 @socketio.on("online_legal")
@@ -328,6 +403,20 @@ def on_online_leave():
 @socketio.on("disconnect")
 def on_disconnect():
     leave_online_room(request.sid)
+    
+@app.route("/game/sync_online", methods=["POST"])
+def sync_online():
+    """Transfer an online game log to the user's local session for analysis."""
+    sid = request.sid # This requires a specific setup, usually you'd pass the room code
+    data = request.json
+    room_code = data.get("room_code")
+    
+    g = online_games.get(room_code)
+    if g:
+        session["ply_log"] = g["ply_log"]
+        session["human_side"] = "pvp" # Set to pvp so engine doesn't auto-move
+        return jsonify({"status": "synced"})
+    return jsonify({"error": "Room not found"}), 404
 
 
 if __name__ == "__main__":

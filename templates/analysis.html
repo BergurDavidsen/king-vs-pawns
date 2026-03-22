@@ -2,6 +2,141 @@
 {% block title %}Chess variant — Analysis{% endblock %}
 {% block header_tag %}Analysis{% endblock %}
 {% block content %}
+    <style>
+      .game-review-intro {
+        margin: 0 0 10px;
+        font-size: 0.72rem;
+        color: var(--text-muted);
+        line-height: 1.45;
+      }
+
+      #analysis .lines-header.review-head {
+        margin-top: 16px;
+        padding-top: 12px;
+        border-top: 1px solid var(--border-subtle);
+      }
+
+      #gameReviewResults {
+        margin-top: 10px;
+        max-height: min(38vh, 320px);
+        overflow-y: auto;
+        padding-right: 4px;
+      }
+
+      #gameReviewResults::-webkit-scrollbar {
+        width: 6px;
+      }
+
+      #gameReviewResults::-webkit-scrollbar-thumb {
+        background: var(--border);
+        border-radius: 3px;
+      }
+
+      .review-summary {
+        font-size: 0.78rem;
+        color: var(--text-muted);
+        margin-bottom: 10px;
+        line-height: 1.4;
+      }
+
+      .review-row {
+        display: grid;
+        grid-template-columns: 28px 1fr;
+        gap: 8px;
+        align-items: start;
+        padding: 8px 8px;
+        margin-bottom: 4px;
+        border-radius: 4px;
+        background: var(--bg-deep);
+        border: 1px solid var(--border-subtle);
+        cursor: pointer;
+        text-align: left;
+        width: 100%;
+        font: inherit;
+        color: var(--text);
+      }
+
+      .review-row:hover {
+        border-color: var(--border);
+        background: var(--surface-raised);
+      }
+
+      .review-row.review-row-active {
+        border-color: var(--blue);
+        box-shadow: 0 0 0 1px var(--blue-dim);
+      }
+
+      .review-row .ply-num {
+        font-weight: 700;
+        font-variant-numeric: tabular-nums;
+        color: var(--text-muted);
+        font-size: 0.72rem;
+      }
+
+      .review-row .mv-line {
+        font-family: ui-monospace, Menlo, Consolas, monospace;
+        font-size: 0.78rem;
+        line-height: 1.35;
+      }
+
+      .review-row .mv-meta {
+        font-size: 0.68rem;
+        color: var(--text-muted);
+        margin-top: 4px;
+      }
+
+      .tag-best {
+        color: var(--accent);
+        font-weight: 700;
+        text-transform: capitalize;
+      }
+      .tag-good {
+        color: #9db88a;
+        font-weight: 600;
+        text-transform: capitalize;
+      }
+      .tag-forced {
+        color: var(--text-muted);
+        font-weight: 600;
+        text-transform: capitalize;
+      }
+      .tag-inaccuracy {
+        color: #e8c36a;
+        font-weight: 600;
+        text-transform: capitalize;
+      }
+      .tag-mistake {
+        color: #e8a070;
+        font-weight: 600;
+        text-transform: capitalize;
+      }
+      .tag-blunder {
+        color: var(--danger);
+        font-weight: 700;
+        text-transform: capitalize;
+      }
+
+      #gameFileInput {
+        display: none;
+      }
+
+      #review-markers {
+        position: absolute;
+        top: 8px;
+        left: 8px;
+        pointer-events: none;
+        z-index: 9;
+      }
+
+      .review-marker-text {
+        font-family: system-ui, -apple-system, sans-serif;
+        font-size: 11px;
+        font-weight: 800;
+        fill: #fff;
+        text-anchor: middle;
+        dominant-baseline: central;
+      }
+    </style>
     <div class="container">
       <aside class="panel panel-left">
         <div class="title">Game</div>
@@ -60,6 +195,17 @@
               Eval bar
             </button>
           </div>
+          <p
+            style="
+              margin: 10px 0 0;
+              font-size: 0.7rem;
+              color: var(--text-muted);
+              line-height: 1.4;
+            "
+          >
+            Open <strong>Engine</strong> for live eval, lines, save/load, and
+            full-game review (icons on the board).
+          </p>
         </div>
 
         <div class="control-section">
@@ -82,6 +228,12 @@
         <div id="board-container">
           <div id="board"></div>
           <svg
+            id="review-markers"
+            width="500"
+            height="500"
+            aria-hidden="true"
+          ></svg>
+          <svg
             id="arrow-layer"
             width="500"
             height="500"
@@ -98,7 +250,7 @@
       </div>
 
       <aside id="analysis" class="panel panel-right panel-hidden">
-        <div class="title">Engine</div>
+        <div class="title">Engine &amp; review</div>
         <div class="best-row">
           <span class="label">Best</span>
           <span id="bestMove">—</span>
@@ -109,6 +261,30 @@
         </div>
         <div class="lines-header">Lines</div>
         <div id="lines"></div>
+
+        <div class="lines-header review-head">Game review</div>
+        <p class="game-review-intro">
+          Save/load JSON, run full-game analysis (same minimax as above). Click
+          a move in the list to jump the board and show that move’s marker
+          (from → to) on the board.
+        </p>
+        <div class="controls-grid single">
+          <button type="button" onclick="saveGameJson()">
+            Save game to file
+          </button>
+          <button type="button" onclick="document.getElementById('gameFileInput').click()">
+            Load game from file
+          </button>
+          <button type="button" class="primary" onclick="runFullGameAnalysis()">
+            Analyze full game
+          </button>
+        </div>
+        <input
+          type="file"
+          id="gameFileInput"
+          accept=".json,application/json"
+        />
+        <div id="gameReviewResults"></div>
       </aside>
     </div>
 {% endblock %}
@@ -119,6 +295,87 @@
       let analysisVisible = false;
       let evalBarVisible = true;
       let selectedSquare = null;
+      let plyLog = [];
+      let lastReviewSteps = [];
+      let selectedReviewPly = null;
+
+      const REVIEW_STYLE = {
+        best: { fill: "#2d6a3a", sym: "✓" },
+        good: { fill: "#5a6b4e", sym: "○" },
+        forced: { fill: "#4a4845", sym: "⊣" },
+        inaccuracy: { fill: "#8a7220", sym: "?!" },
+        mistake: { fill: "#a85a28", sym: "?" },
+        blunder: { fill: "#a02828", sym: "×" },
+      };
+
+      function clearReviewMarkers() {
+        const svg = document.getElementById("review-markers");
+        if (svg) svg.innerHTML = "";
+      }
+
+      function clearGameReview() {
+        lastReviewSteps = [];
+        selectedReviewPly = null;
+        const box = document.getElementById("gameReviewResults");
+        if (box) box.innerHTML = "";
+        clearReviewMarkers();
+      }
+
+      /** Board markers only for the selected review row (one ply at a time). */
+      function drawReviewMarkers(steps, highlightPly) {
+        const boardEl = document.getElementById("board");
+        const svg = document.getElementById("review-markers");
+        if (
+          !svg ||
+          !steps ||
+          !steps.length ||
+          highlightPly === null ||
+          highlightPly === undefined
+        ) {
+          clearReviewMarkers();
+          return;
+        }
+
+        const s = steps.find((x) => x.ply === highlightPly);
+        if (!s) {
+          clearReviewMarkers();
+          return;
+        }
+
+        const bWidth = boardEl.offsetWidth;
+        const bHeight = boardEl.offsetHeight;
+        svg.setAttribute("width", bWidth);
+        svg.setAttribute("height", bHeight);
+        svg.setAttribute(
+          "style",
+          "position:absolute;top:8px;left:8px;pointer-events:none;z-index:9;"
+        );
+
+        if (bWidth === 0) return;
+
+        const sq = bWidth / 8;
+        const tx = s.played.to[0] * sq + sq / 2;
+        const ty = (7 - s.played.to[1]) * sq + sq / 2;
+        const fx = s.played.from[0] * sq + sq / 2;
+        const fy = (7 - s.played.from[1]) * sq + sq / 2;
+
+        const cls = (s.classification || "good").replace(/[^a-z]/g, "") || "good";
+        const st = REVIEW_STYLE[cls] || REVIEW_STYLE.good;
+        const symFs = st.sym.length > 1 ? 7.5 : 10.5;
+
+        const lines =
+          `<line x1="${fx}" y1="${fy}" x2="${tx}" y2="${ty}" stroke="rgba(255,255,255,0.28)" stroke-width="2" stroke-linecap="round"/>` +
+          `<circle cx="${fx}" cy="${fy}" r="5" fill="none" stroke="${st.fill}" stroke-width="2" opacity="0.85"/>`;
+
+        const node =
+          `<g><title>Ply ${s.ply} (${s.side || ""}): ${s.classification}</title>` +
+          `<circle cx="${tx}" cy="${ty}" r="13" fill="${st.fill}" stroke="#fff" stroke-width="2.5"/>` +
+          `<text class="review-marker-text" x="${tx}" y="${ty - 1}" font-size="${symFs}">${st.sym}</text>` +
+          `<text class="review-marker-text" x="${tx}" y="${ty + 7}" font-size="6.5" opacity="0.92">${s.ply}</text>` +
+          `</g>`;
+
+        svg.innerHTML = lines + node;
+      }
 
       function pieceTheme(piece) {
         return (
@@ -127,6 +384,181 @@
       }
       function reset_board() {
         location.reload();
+      }
+
+      function moveUci(m) {
+        const a = m.from;
+        const b = m.to;
+        return (
+          String.fromCharCode(97 + a[0]) +
+          (a[1] + 1) +
+          " → " +
+          String.fromCharCode(97 + b[0]) +
+          (b[1] + 1)
+        );
+      }
+
+      function saveGameJson() {
+        fetch("/game/export")
+          .then((r) => r.json())
+          .then((data) => {
+            const blob = new Blob([JSON.stringify(data, null, 2)], {
+              type: "application/json",
+            });
+            const a = document.createElement("a");
+            a.href = URL.createObjectURL(blob);
+            a.download = "king-vs-pawn-game.json";
+            a.click();
+            URL.revokeObjectURL(a.href);
+          })
+          .catch(() => {
+            document.getElementById("status").textContent =
+              "Could not export game.";
+          });
+      }
+
+      document
+        .getElementById("gameFileInput")
+        .addEventListener("change", function (ev) {
+          const f = ev.target.files && ev.target.files[0];
+          ev.target.value = "";
+          if (!f) return;
+          const reader = new FileReader();
+          reader.onload = () => {
+            try {
+              const data = JSON.parse(reader.result);
+              const moves = data.moves;
+              if (!Array.isArray(moves)) throw new Error("no moves array");
+              document.getElementById("overlay").style.display = "flex";
+              fetch("/game/load", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ moves }),
+              })
+                .then((r) => r.json().then((j) => ({ ok: r.ok, j })))
+                .then(({ ok, j }) => {
+                  document.getElementById("overlay").style.display = "none";
+                  if (!ok) {
+                    document.getElementById("status").textContent =
+                      j.error || "Load failed";
+                    return;
+                  }
+                  updateUI(j);
+                  document.getElementById("status").textContent =
+                    "Loaded game — use Analyze full game when ready.";
+                })
+                .catch(() => {
+                  document.getElementById("overlay").style.display = "none";
+                  document.getElementById("status").textContent =
+                    "Load failed.";
+                });
+            } catch (e) {
+              document.getElementById("status").textContent =
+                "Invalid JSON file.";
+            }
+          };
+          reader.readAsText(f);
+        });
+
+      function runFullGameAnalysis() {
+        clearReviewMarkers();
+        selectedReviewPly = null;
+        const box = document.getElementById("gameReviewResults");
+        box.innerHTML =
+          '<p class="review-summary">Running engine on each position…</p>';
+        if (!analysisVisible) {
+          toggleAnalysis();
+        }
+        document.getElementById("overlay").style.display = "flex";
+        fetch("/game/analyze", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ moves: plyLog.length ? plyLog : undefined }),
+        })
+          .then((r) => r.json().then((j) => ({ ok: r.ok, j })))
+          .then(({ ok, j }) => {
+            document.getElementById("overlay").style.display = "none";
+            if (!ok) {
+              box.innerHTML = "";
+              lastReviewSteps = [];
+              clearReviewMarkers();
+              document.getElementById("status").textContent =
+                j.error || "Analysis failed";
+              return;
+            }
+            renderGameReview(j.steps || []);
+          })
+          .catch(() => {
+            document.getElementById("overlay").style.display = "none";
+            box.innerHTML = "";
+            lastReviewSteps = [];
+            clearReviewMarkers();
+            document.getElementById("status").textContent =
+              "Analysis request failed.";
+          });
+      }
+
+      function renderGameReview(steps) {
+        const box = document.getElementById("gameReviewResults");
+        selectedReviewPly = null;
+        lastReviewSteps = steps;
+        if (!steps.length) {
+          box.innerHTML =
+            '<p class="review-summary">No moves in this game.</p>';
+          clearReviewMarkers();
+          return;
+        }
+
+        const counts = {};
+        steps.forEach((s) => {
+          const c = s.classification || "?";
+          counts[c] = (counts[c] || 0) + 1;
+        });
+        const parts = Object.keys(counts)
+          .sort()
+          .map((k) => `${k}: ${counts[k]}`);
+        let html =
+          '<p class="review-summary">Click a move to jump the board and show its review marker (from → to) on the board only for that ply. ' +
+          parts.join(" · ") +
+          "</p>";
+
+        steps.forEach((s) => {
+          const cls = s.classification || "good";
+          const tagClass = "tag-" + cls.replace(/[^a-z]/g, "") || "good";
+          const side = s.side === "king" ? "King" : "Pawns";
+          const played = moveUci(s.played);
+          const best = s.best_move ? moveUci(s.best_move) : "—";
+          html += `<button type="button" class="review-row" data-ply="${s.ply}" data-fen="${encodeURIComponent(s.fen_after)}">`;
+          html += `<span class="ply-num">${s.ply}</span><div>`;
+          html += `<div class="mv-line"><strong>${side}</strong> ${played}`;
+          html += ` <span class="${tagClass}">${cls}</span></div>`;
+          html += `<div class="mv-meta">Best was <strong>${best}</strong> · `;
+          html += `before ${s.eval_before_text} → after ${s.eval_after_played_text}`;
+          if (!s.is_only_move && cls !== "best" && cls !== "forced") {
+            html += ` (best line → ${s.eval_after_best_text})`;
+          }
+          html += "</div></div></button>";
+        });
+
+        box.innerHTML = html;
+        clearReviewMarkers();
+        box.querySelectorAll(".review-row").forEach((btn) => {
+          btn.addEventListener("click", () => {
+            selectedReviewPly = parseInt(btn.getAttribute("data-ply") || "0", 10);
+            const fen = decodeURIComponent(btn.getAttribute("data-fen") || "");
+            if (fen) board.position(fen);
+            removeHighlights();
+            selectedSquare = null;
+            drawReviewMarkers(lastReviewSteps, selectedReviewPly);
+            box.querySelectorAll(".review-row").forEach((b) => {
+              b.classList.toggle(
+                "review-row-active",
+                parseInt(b.getAttribute("data-ply") || "0", 10) ===
+                  selectedReviewPly
+              );
+            });
+          });
+        });
       }
       function toSquare(pos) {
         return String.fromCharCode(97 + pos[0]) + (pos[1] + 1);
@@ -363,7 +795,12 @@
           handleSquareClick.call(this, e);
         });
 
-      window.addEventListener("resize", () => board.resize());
+      window.addEventListener("resize", () => {
+        board.resize();
+        if (lastReviewSteps.length && selectedReviewPly != null) {
+          drawReviewMarkers(lastReviewSteps, selectedReviewPly);
+        }
+      });
 
       function drawArrow(from, to) {
         if (!analysisVisible) return;
@@ -409,8 +846,10 @@
       }
 
       function updateUI(data) {
+        clearGameReview();
         board.position(data.fen);
         humanSide = data.human_side;
+        if (Array.isArray(data.ply_log)) plyLog = data.ply_log;
 
         const status = document.getElementById("status");
         if (data.winner !== 0) {
